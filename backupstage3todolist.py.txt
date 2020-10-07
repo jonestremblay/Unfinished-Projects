@@ -1,0 +1,135 @@
+from datetime import *
+from sqlalchemy import *
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import sessionmaker
+
+engine = create_engine('sqlite:///todo.db?check_same_thread=False')
+Base = declarative_base()
+
+
+class Table(Base):
+    __tablename__ = 'task'
+    id = Column(Integer, primary_key=True)
+    task = Column(String, default="default_value")
+    deadline = Column(Date, default=datetime.today())
+
+    def __repr__(self):
+        return self.task
+
+
+Base.metadata.create_all(engine)
+Session = sessionmaker(bind=engine)
+session = Session()
+
+
+# def remove_symbols_from_string(fetch) -> str:
+#     """
+#     Convert the fetch into a string, then removes symbols   [ ] ( ) ,    from the string.
+#     """
+#     string = str(fetch)
+#     for z in ("[", ""), ("]", ""), ("(", ""), (")", ""), (",", ""):
+#         string = string.replace(*z)
+#     return string
+#
+#
+# def get_new_task_id(day) -> int:
+#     """
+#     Find the id number of the last task, increment and return it.
+#     :return: Next ID number for task
+#     """
+#     count = 0
+#     rows = session.query(Table).filter(Table.date_field == day).all()
+#     for i in rows:
+#         count += 1
+#     return count
+
+
+def get_complete_week(p_date) -> list:
+    """
+    :param p_date: Commonly the today.
+    :return: Dictionary containing the current week's days.
+    """
+    week = []
+    # start_week = p_date - timedelta(days=p_date.isoweekday() % 7)
+    for i in range(7):
+        day = p_date + timedelta(days=i)
+        week.append(day)
+    return week
+
+
+def formatted_tasks(rows):
+    all_tasks = rows
+    count = 1
+    formatted_tasks = ""
+    for x_task in all_tasks:
+        formatted_tasks += \
+            "{0}. {1}. {2} {3}\n".format(count, x_task.task, x_task.deadline.day, x_task.deadline.strftime('%b'))
+        count += 1
+    no_date_formatted_tasks = ""
+    count2 = 1
+    for x_task in all_tasks:
+        no_date_formatted_tasks += \
+            "{0}. {1}\n".format(count2, x_task.task)
+        count2 += 1
+    return formatted_tasks, count, no_date_formatted_tasks, count2
+
+
+choice = int
+while choice != 0:
+    task_list = session.query(Table).all()
+    to_do_list = []
+    for i in task_list:
+        to_do_list.append(i)
+    print("1) Today\'s tasks\n2) Week's tasks\n3) All tasks\n4) Add tasks\n0) Exit\n")
+    choice = int(input())
+    if choice == 1:     # Today's task
+        print("\nToday " + str(datetime.today().day) + " " + datetime.today().strftime('%b') + ":")
+        rows = session.query(Table).filter(Table.deadline == datetime.today().date()).all()
+        if not rows:
+            print("Nothing to do!\n")
+            continue
+        print(formatted_tasks(rows)[2])
+        continue
+    elif choice == 2:
+        week = get_complete_week(datetime.today())
+        # week.sort()
+        # print(week)
+        for i in week:
+            print("\n" + i.strftime("%A %d %b") + ":")
+            rows = session.query(Table).filter(Table.deadline == i.date()).all()
+            if not rows:
+                print("Nothing to do!")
+                continue
+            print(formatted_tasks(rows)[2].strip())
+            continue
+        print()
+        continue
+    elif choice == 3:   # All tasks
+        print("\nAll tasks:")
+        if not to_do_list:  # Checks if the list is empty.
+            print("Nothing to do!\n")
+        else:
+            rows = session.query(Table).order_by(Table.deadline).all()
+            print(formatted_tasks(rows)[0])
+        continue
+    elif choice == 4:   # Add task
+        task = input("\nEnter task\n")
+        # n = concatenate_to_do_list(to_do_list)[1]
+        deadline_input = input("Enter deadline\n")
+        split = deadline_input.split("-")
+        deadline = date(int(split[0]), int(split[1]), int(split[2]))
+        # id_n = get_new_task_id(deadline)
+        new_task_to_add = Table(task=task, deadline=deadline)
+        session.add(new_task_to_add)
+        session.commit()
+        print("The task has been added!\n")
+        continue
+    elif choice == 0:   # Exit
+        print("\nBye!\n")
+        exit()
+    # elif choice == 999:   # Delete all.
+    #     Base.metadata.drop_all(engine)
+    # elif choice == 10:                      # TEST choice
+    #     pass
+
+
